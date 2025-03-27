@@ -4,11 +4,13 @@
  */
 package duan1_bangiay.repository;
 
-import duan1_bangiay.model.HoaDonChiTiet;
+import duan1_bangiay.model.ChiTietHoaDon;
 import duan1_bangiay.utils.DBConnect;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.sql.*;
+import javax.swing.JOptionPane;
 
 /**
  *
@@ -16,33 +18,56 @@ import java.sql.*;
  */
 public class HoaDonChiTietRepository {
 
-    public List<HoaDonChiTiet> getInvoiceDetailsByHoaDonId(int idHoaDon) {
-        List<HoaDonChiTiet> chiTietList = new ArrayList<>();
-        String query = "SELECT sp.TenSanPham, cthd.SoLuong, cthd.DonGia, (cthd.SoLuong * cthd.DonGia) AS ThanhTien "
+    public List<Object[]> fetchOrderDetailsFromDatabase(String maDonHang) {
+        List<Object[]> orderDetails = new ArrayList<>();
+        String sql = "SELECT ROW_NUMBER() OVER (ORDER BY cthd.ID) AS STT, "
+                + "sp.TenSanPham AS TenHangHoa, cthd.DonGia, cthd.SoLuong, "
+                + "(cthd.DonGia * cthd.SoLuong) AS ThanhTien "
                 + "FROM ChiTietHoaDon cthd "
                 + "JOIN SanPham sp ON cthd.IDSanPham = sp.ID "
-                + "WHERE cthd.IDHoaDon = ?";
+                + "JOIN HoaDon hd ON cthd.IDHoaDon = hd.ID "
+                + "WHERE hd.MaHoaDon = ?";
 
-        try (Connection connection = DBConnect.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+        try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
 
-            preparedStatement.setInt(1, idHoaDon);
+            ps.setString(1, maDonHang);
 
-            try (ResultSet resultSet = preparedStatement.executeQuery()) {
-                int stt = 1; // Start serial number at 1
-                while (resultSet.next()) {
-                    HoaDonChiTiet chiTiet = new HoaDonChiTiet();
-                    chiTiet.setStt(stt++);
-                    chiTiet.setTenSanPham(resultSet.getString("TenSanPham"));
-                    chiTiet.setSoLuong(resultSet.getInt("SoLuong"));
-                    chiTiet.setDonGia(resultSet.getBigDecimal("DonGia"));
-                    chiTiet.setThanhTien(resultSet.getBigDecimal("ThanhTien"));
-
-                    chiTietList.add(chiTiet);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Object[] row = new Object[]{
+                        rs.getInt("STT"), // Serial Number
+                        rs.getString("TenHangHoa"), // Product Name
+                        rs.getBigDecimal("DonGia"), // Unit Price
+                        rs.getInt("SoLuong"), // Quantity
+                        rs.getBigDecimal("ThanhTien") // Total Price
+                    };
+                    orderDetails.add(row);
                 }
             }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Error fetching order details: " + e.getMessage());
+        }
+
+        return orderDetails;
+    }
+
+    public void saveProductToInvoice(String maDonHang, String maSanPham, int soLuong, BigDecimal donGia) {
+        String sql = "INSERT INTO ChiTietHoaDon (IDHoaDon, IDSanPham, SoLuong, DonGia) "
+                + "VALUES ((SELECT ID FROM HoaDon WHERE MaHoaDon = ?), "
+                + "(SELECT ID FROM SanPham WHERE MaSanPham = ?), ?, ?)";
+        try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
+
+            ps.setString(1, maDonHang);
+            ps.setString(2, maSanPham);
+            ps.setInt(3, soLuong);
+            ps.setBigDecimal(4, donGia);
+
+            ps.executeUpdate();
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return chiTietList;
     }
 }

@@ -4,57 +4,33 @@
  */
 package duan1_bangiay.model;
 
-/**
- *
- * @author Vinh
- */
 import java.math.BigDecimal;
-import java.util.Date;
+import java.time.LocalDateTime;
 
 public class HoaDon {
 
-    private int id;               // Primary Key
-    private int idNhanVien;       // Foreign Key referencing NhanVien
-    private int idKhachHang;      // Foreign Key referencing KhachHang
-    private int idPhieuGiamGia;   // Foreign Key referencing PhieuGiamGia
-    private BigDecimal tongTien;  // Total Amount
-    private BigDecimal giamGia;   // Discount Amount
-    private Date ngayTao;         // Creation Date
-    private BigDecimal thanhTien; // Final Amount
-    private boolean trangThai;    // Status (Paid/Unpaid)
-    // Additional fields for names
-    private String tenKhachHang;
-    private String tenNhanVien;
+    private int id; // Primary key
+    private int idNhanVien; // Foreign key
+    private int idKhachHang; // Foreign key
+    private int idPhieuGiamGia; // Foreign key
+    private String maHoaDon; // Unique identifier
+    private BigDecimal tongTien; // Total amount
+    private BigDecimal giamGia; // Discount
+    private LocalDateTime ngayTao; // Creation date
+    private BigDecimal thanhTien; // Final amount
+    private boolean trangThai; // Status (active/inactive)
 
-    // Getters and Setters for the names
-    public String getTenKhachHang() {
-        return tenKhachHang;
-    }
-
-    public void setTenKhachHang(String tenKhachHang) {
-        this.tenKhachHang = tenKhachHang;
-    }
-
-    public String getTenNhanVien() {
-        return tenNhanVien;
-    }
-
-    public void setTenNhanVien(String tenNhanVien) {
-        this.tenNhanVien = tenNhanVien;
-    }
-
-    // Constructor (no-argument)
+    // Constructors
     public HoaDon() {
     }
 
-    // Constructor (with arguments)
-    public HoaDon(int id, int idNhanVien, int idKhachHang, int idPhieuGiamGia,
-            BigDecimal tongTien, BigDecimal giamGia, Date ngayTao,
-            BigDecimal thanhTien, boolean trangThai) {
+    public HoaDon(int id, int idNhanVien, int idKhachHang, int idPhieuGiamGia, String maHoaDon, BigDecimal tongTien,
+            BigDecimal giamGia, LocalDateTime ngayTao, BigDecimal thanhTien, boolean trangThai) {
         this.id = id;
         this.idNhanVien = idNhanVien;
         this.idKhachHang = idKhachHang;
         this.idPhieuGiamGia = idPhieuGiamGia;
+        this.maHoaDon = maHoaDon;
         this.tongTien = tongTien;
         this.giamGia = giamGia;
         this.ngayTao = ngayTao;
@@ -95,6 +71,14 @@ public class HoaDon {
         this.idPhieuGiamGia = idPhieuGiamGia;
     }
 
+    public String getMaHoaDon() {
+        return maHoaDon;
+    }
+
+    public void setMaHoaDon(String maHoaDon) {
+        this.maHoaDon = maHoaDon;
+    }
+
     public BigDecimal getTongTien() {
         return tongTien;
     }
@@ -111,11 +95,11 @@ public class HoaDon {
         this.giamGia = giamGia;
     }
 
-    public Date getNgayTao() {
+    public LocalDateTime getNgayTao() {
         return ngayTao;
     }
 
-    public void setNgayTao(Date ngayTao) {
+    public void setNgayTao(LocalDateTime ngayTao) {
         this.ngayTao = ngayTao;
     }
 
@@ -135,7 +119,6 @@ public class HoaDon {
         this.trangThai = trangThai;
     }
 
-    // Override toString for debugging/logging purposes
     @Override
     public String toString() {
         return "HoaDon{"
@@ -143,11 +126,12 @@ public class HoaDon {
                 + ", idNhanVien=" + idNhanVien
                 + ", idKhachHang=" + idKhachHang
                 + ", idPhieuGiamGia=" + idPhieuGiamGia
+                + ", maHoaDon='" + maHoaDon + '\''
                 + ", tongTien=" + tongTien
                 + ", giamGia=" + giamGia
                 + ", ngayTao=" + ngayTao
                 + ", thanhTien=" + thanhTien
-                + ", trangThai=" + (trangThai ? "Đã thanh toán" : "Chưa thanh toán")
+                + ", trangThai=" + trangThai
                 + '}';
     }
 }

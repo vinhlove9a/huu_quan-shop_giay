@@ -6,6 +6,7 @@ package duan1_bangiay.repository;
 
 import duan1_bangiay.model.HoaDon;
 import duan1_bangiay.utils.DBConnect;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.sql.*;
@@ -16,94 +17,51 @@ import java.sql.*;
  */
 public class HoaDonRepository {
 
-    public List<HoaDon> getUnpaidInvoices() {
-        List<HoaDon> hoaDonList = new ArrayList<>();
-        String query = "SELECT ID, IDNhanVien, IDKhachHang, IDPhieuGiamGia, NgayTao, TongTien, GiamGia, ThanhTien, TrangThai "
-                + "FROM HoaDon WHERE TrangThai = 0";
+    public List<HoaDon> getHoaDonChuaThanhToan() {
+        List<HoaDon> unpaidInvoices = new ArrayList<>();
+        String sql = "SELECT MaHoaDon, IDKhachHang, IDNhanVien, IDPhieuGiamGia, NgayTao, TongTien "
+                + "FROM HoaDon WHERE TrangThai = 0"; // TrangThai = 1 for "Chưa thanh toán"
 
-        try (Connection connection = DBConnect.getConnection(); Statement statement = connection.createStatement(); ResultSet resultSet = statement.executeQuery(query)) {
-
+        try (Connection connection = DBConnect.getConnection(); Statement statement = connection.createStatement(); ResultSet resultSet = statement.executeQuery(sql)) {
             while (resultSet.next()) {
                 HoaDon hoaDon = new HoaDon();
-                hoaDon.setId(resultSet.getInt("ID"));
-                hoaDon.setIdNhanVien(resultSet.getInt("IDNhanVien"));
+                hoaDon.setMaHoaDon(resultSet.getString("MaHoaDon"));
                 hoaDon.setIdKhachHang(resultSet.getInt("IDKhachHang"));
+                hoaDon.setIdNhanVien(resultSet.getInt("IDNhanVien"));
                 hoaDon.setIdPhieuGiamGia(resultSet.getInt("IDPhieuGiamGia"));
-                hoaDon.setNgayTao(resultSet.getTimestamp("NgayTao"));
+                hoaDon.setNgayTao(resultSet.getTimestamp("NgayTao").toLocalDateTime());
                 hoaDon.setTongTien(resultSet.getBigDecimal("TongTien"));
-                hoaDon.setGiamGia(resultSet.getBigDecimal("GiamGia"));
-                hoaDon.setThanhTien(resultSet.getBigDecimal("ThanhTien"));
-                hoaDon.setTrangThai(resultSet.getBoolean("TrangThai"));
-
-                hoaDonList.add(hoaDon);
+                unpaidInvoices.add(hoaDon);
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return hoaDonList;
+
+        return unpaidInvoices;
     }
 
-    public List<HoaDon> getPaidInvoices() {
-        List<HoaDon> hoaDonList = new ArrayList<>();
-        String query = "SELECT ID, IDNhanVien, IDKhachHang, IDPhieuGiamGia, NgayTao, TongTien, GiamGia, ThanhTien, TrangThai "
-                + "FROM HoaDon WHERE TrangThai = 1";
+    public List<HoaDon> getHoaDonDaThanhToan() {
+        List<HoaDon> paidInvoices = new ArrayList<>();
+        String sql = "SELECT MaHoaDon, IDKhachHang, IDNhanVien, IDPhieuGiamGia, NgayTao, TongTien "
+                + "FROM HoaDon WHERE TrangThai = 1"; // TrangThai = 0 for "Đã thanh toán"
 
-        try (Connection connection = DBConnect.getConnection(); Statement statement = connection.createStatement(); ResultSet resultSet = statement.executeQuery(query)) {
-
+        try (Connection connection = DBConnect.getConnection(); Statement statement = connection.createStatement(); ResultSet resultSet = statement.executeQuery(sql)) {
             while (resultSet.next()) {
                 HoaDon hoaDon = new HoaDon();
-                hoaDon.setId(resultSet.getInt("ID"));
-                hoaDon.setIdNhanVien(resultSet.getInt("IDNhanVien"));
+                hoaDon.setMaHoaDon(resultSet.getString("MaHoaDon"));
                 hoaDon.setIdKhachHang(resultSet.getInt("IDKhachHang"));
+                hoaDon.setIdNhanVien(resultSet.getInt("IDNhanVien"));
                 hoaDon.setIdPhieuGiamGia(resultSet.getInt("IDPhieuGiamGia"));
-                hoaDon.setNgayTao(resultSet.getTimestamp("NgayTao"));
+                hoaDon.setNgayTao(resultSet.getTimestamp("NgayTao").toLocalDateTime());
                 hoaDon.setTongTien(resultSet.getBigDecimal("TongTien"));
-                hoaDon.setGiamGia(resultSet.getBigDecimal("GiamGia"));
-                hoaDon.setThanhTien(resultSet.getBigDecimal("ThanhTien"));
-                hoaDon.setTrangThai(resultSet.getBoolean("TrangThai"));
-
-                hoaDonList.add(hoaDon);
+                paidInvoices.add(hoaDon);
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return hoaDonList;
+
+        return paidInvoices;
     }
-    public HoaDon getHoaDonWithNames(int hoaDonId) {
-    String query = "SELECT hd.ID, hd.IDNhanVien, hd.IDKhachHang, hd.NgayTao, hd.TongTien, hd.GiamGia, hd.ThanhTien, hd.TrangThai, " +
-                   "kh.TenKhachHang, nv.TenNhanVien " +
-                   "FROM HoaDon hd " +
-                   "JOIN KhachHang kh ON hd.IDKhachHang = kh.ID " +
-                   "JOIN NhanVien nv ON hd.IDNhanVien = nv.ID " +
-                   "WHERE hd.ID = ?";
 
-    try (Connection connection = DBConnect.getConnection();
-         PreparedStatement preparedStatement = connection.prepareStatement(query)) {
-
-        preparedStatement.setInt(1, hoaDonId);
-
-        try (ResultSet resultSet = preparedStatement.executeQuery()) {
-            if (resultSet.next()) {
-                HoaDon hoaDon = new HoaDon();
-                hoaDon.setId(resultSet.getInt("ID"));
-                hoaDon.setIdNhanVien(resultSet.getInt("IDNhanVien"));
-                hoaDon.setIdKhachHang(resultSet.getInt("IDKhachHang"));
-                hoaDon.setNgayTao(resultSet.getTimestamp("NgayTao"));
-                hoaDon.setTongTien(resultSet.getBigDecimal("TongTien"));
-                hoaDon.setGiamGia(resultSet.getBigDecimal("GiamGia"));
-                hoaDon.setThanhTien(resultSet.getBigDecimal("ThanhTien"));
-                hoaDon.setTrangThai(resultSet.getBoolean("TrangThai"));
-
-                // Fill the names
-                hoaDon.setTenKhachHang(resultSet.getString("TenKhachHang"));
-                hoaDon.setTenNhanVien(resultSet.getString("TenNhanVien"));
-
-                return hoaDon;
-            }
-        }
-    } catch (SQLException e) {
-        e.printStackTrace();
-    }
-    return null;
-}
+    
 }

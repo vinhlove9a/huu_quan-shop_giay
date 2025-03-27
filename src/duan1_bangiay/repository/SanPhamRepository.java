@@ -12,73 +12,78 @@ import java.util.List;
 
 public class SanPhamRepository {
 
-    public List<SanPham> getAll() {
-        List<SanPham> sanPhamList = new ArrayList<>();
-        String query = "SELECT sp.MaSanPham, sp.TenSanPham, th.TenTH AS ThuongHieu, "
-                + "ctsp.DonGia AS GiaBan, ctsp.SoLuong, kt.TenKT AS Size, ms.TenMS AS MauSac "
+    public List<Object[]> getAllSanPham() {
+        List<Object[]> dataList = new ArrayList<>();
+        String sql = "SELECT ROW_NUMBER() OVER (ORDER BY sp.ID) AS STT, "
+                + "sp.MaSanPham, sp.TenSanPham, th.TenTH AS ThuongHieu, "
+                + "ctp.DonGia AS GiaBan, ctp.SoLuong, kt.TenKT AS Size, ms.TenMS AS MauSac "
                 + "FROM SanPham sp "
-                + "JOIN ChiTietSanPham ctsp ON sp.IDChiTietSanPham = ctsp.ID "
-                + "JOIN ThuongHieu th ON ctsp.IDThuongHieu = th.ID "
-                + "JOIN KichThuoc kt ON ctsp.IDKichThuoc = kt.ID "
-                + "JOIN MauSac ms ON ctsp.IDMauSac = ms.ID";
+                + "JOIN ChiTietSanPham ctp ON sp.IDChiTietSanPham = ctp.ID "
+                + "JOIN ThuongHieu th ON ctp.IDThuongHieu = th.ID "
+                + "JOIN KichThuoc kt ON ctp.IDKichThuoc = kt.ID "
+                + "JOIN MauSac ms ON ctp.IDMauSac = ms.ID";
 
-        try (Connection connection = DBConnect.getConnection(); Statement statement = connection.createStatement(); ResultSet resultSet = statement.executeQuery(query)) {
-
-            int stt = 1; // Serial number
-            while (resultSet.next()) {
-                SanPham sanPham = new SanPham(
-                        stt++, // Serial number
-                        resultSet.getString("MaSanPham"), // Product Code
-                        resultSet.getString("TenSanPham"), // Product Name
-                        resultSet.getString("ThuongHieu"), // Brand
-                        resultSet.getBigDecimal("GiaBan"), // Price
-                        resultSet.getInt("SoLuong"), // Quantity
-                        resultSet.getString("Size"), // Size
-                        resultSet.getString("MauSac") // Color
-                );
-
-                sanPhamList.add(sanPham);
+        try (Connection connection = DBConnect.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            ResultSet rs = preparedStatement.executeQuery();
+            while (rs.next()) {
+                Object[] row = new Object[]{
+                    rs.getInt("STT"),
+                    rs.getString("MaSanPham"),
+                    rs.getString("TenSanPham"),
+                    rs.getString("ThuongHieu"),
+                    rs.getBigDecimal("GiaBan"),
+                    rs.getInt("SoLuong"),
+                    rs.getString("Size"),
+                    rs.getString("MauSac")
+                };
+                dataList.add(row);
             }
-        } catch (SQLException e) {
+
+        } catch (Exception e) {
             e.printStackTrace();
         }
-        return sanPhamList;
+
+        return dataList;
     }
 
-    public List<SanPham> searchSanPham(String searchText) {
-        List<SanPham> sanPhamList = new ArrayList<>();
-        String query = "SELECT sp.MaSanPham, sp.TenSanPham, th.TenTH AS ThuongHieu, "
-                + "ctsp.DonGia AS GiaBan, ctsp.SoLuong, kt.TenKT AS Size, ms.TenMS AS MauSac "
+    public List<Object[]> searchSanPham(String keyword) {
+        List<Object[]> searchResults = new ArrayList<>();
+        String sql = "SELECT ROW_NUMBER() OVER (ORDER BY sp.ID) AS STT, "
+                + "sp.MaSanPham, sp.TenSanPham, th.TenTH AS ThuongHieu, "
+                + "ctp.DonGia AS GiaBan, ctp.SoLuong, kt.TenKT AS Size, ms.TenMS AS MauSac "
                 + "FROM SanPham sp "
-                + "JOIN ChiTietSanPham ctsp ON sp.IDChiTietSanPham = ctsp.ID "
-                + "JOIN ThuongHieu th ON ctsp.IDThuongHieu = th.ID "
-                + "JOIN KichThuoc kt ON ctsp.IDKichThuoc = kt.ID "
-                + "JOIN MauSac ms ON ctsp.IDMauSac = ms.ID "
+                + "JOIN ChiTietSanPham ctp ON sp.IDChiTietSanPham = ctp.ID "
+                + "JOIN ThuongHieu th ON ctp.IDThuongHieu = th.ID "
+                + "JOIN KichThuoc kt ON ctp.IDKichThuoc = kt.ID "
+                + "JOIN MauSac ms ON ctp.IDMauSac = ms.ID "
                 + "WHERE sp.MaSanPham LIKE ? OR sp.TenSanPham LIKE ?";
 
-        try (Connection connection = DBConnect.getConnection(); PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+        try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
 
-            preparedStatement.setString(1, "%" + searchText + "%"); // Search by MaSanPham
-            preparedStatement.setString(2, "%" + searchText + "%"); // Search by TenSanPham
+            // Use wildcard to perform partial matches
+            ps.setString(1, "%" + keyword + "%");
+            ps.setString(2, "%" + keyword + "%");
 
-            try (ResultSet resultSet = preparedStatement.executeQuery()) {
-                while (resultSet.next()) {
-                    SanPham sanPham = new SanPham(
-                            0, // STT will be added in the view
-                            resultSet.getString("MaSanPham"),
-                            resultSet.getString("TenSanPham"),
-                            resultSet.getString("ThuongHieu"),
-                            resultSet.getBigDecimal("GiaBan"),
-                            resultSet.getInt("SoLuong"),
-                            resultSet.getString("Size"),
-                            resultSet.getString("MauSac")
-                    );
-                    sanPhamList.add(sanPham);
-                }
+            ResultSet rs = ps.executeQuery();
+
+            while (rs.next()) {
+                Object[] row = new Object[]{
+                    rs.getInt("STT"), // Serial Number
+                    rs.getString("MaSanPham"), // Product Code
+                    rs.getString("TenSanPham"), // Product Name
+                    rs.getString("ThuongHieu"), // Brand
+                    rs.getBigDecimal("GiaBan"), // Price
+                    rs.getInt("SoLuong"), // Quantity
+                    rs.getString("Size"), // Size
+                    rs.getString("MauSac") // Color
+                };
+                searchResults.add(row);
             }
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return sanPhamList;
+
+        return searchResults;
     }
 }
