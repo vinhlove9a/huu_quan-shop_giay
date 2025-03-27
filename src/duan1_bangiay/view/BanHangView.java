@@ -70,6 +70,7 @@ public class BanHangView extends javax.swing.JFrame {
 
                 if (selectedRow != -1) {
                     handleOrderRowClick(selectedRow, tblChuaThanhToan);
+                    populateFieldsFromInvoice(selectedRow); // New method to fill text fields
                 }
             }
         });
@@ -80,9 +81,64 @@ public class BanHangView extends javax.swing.JFrame {
                 int selectedRow = tblDaThanhToan.getSelectedRow();
                 if (selectedRow != -1) {
                     handleOrderRowClick(selectedRow, tblDaThanhToan);
+                    clearTextFields();
                 }
             }
         });
+    }
+
+    private void clearTextFields() {
+        txtMaHoaDon.setText(""); // Clear Mã Hóa Đơn
+        txtSoDienThoai.setText(""); // Clear Số Điện Thoại
+        txtTenKhachHang.setText(""); // Clear Tên Khách Hàng
+        txtMaNhanVien.setText(""); // Clear Mã Nhân Viên
+        txtTongTien.setText("");
+        txtThanhTien.setText("");
+        // Reset radio buttons (assuming there are male and female options)
+        rdoNam.setSelected(false);
+        rdoNu.setSelected(false);
+
+        System.out.println("All text fields and radio buttons have been cleared.");
+    }
+
+    private void populateFieldsFromInvoice(int selectedRow) {
+        try {
+            // Retrieve MaHoaDon from the selected row in tblChuaThanhToan
+            DefaultTableModel model = (DefaultTableModel) tblChuaThanhToan.getModel();
+            String maHoaDon = model.getValueAt(selectedRow, 0).toString(); // Assuming MaHoaDon is in column 0
+
+            // Query to get all invoice details from HoaDon table based on MaHoaDon
+            String sql = "SELECT hd.MaHoaDon, hd.TongTien, hd.ThanhTien, kh.SDT, kh.TenKhachHang, kh.GioiTinh, nv.MaNhanVien "
+                    + "FROM HoaDon hd "
+                    + "JOIN KhachHang kh ON hd.IDKhachHang = kh.ID "
+                    + "JOIN NhanVien nv ON hd.IDNhanVien = nv.ID "
+                    + "WHERE hd.MaHoaDon = ?";
+
+            try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
+                ps.setString(1, maHoaDon);
+
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        // Fill text fields with data from ResultSet
+                        txtMaHoaDon.setText(rs.getString("MaHoaDon"));
+                        txtSoDienThoai.setText(rs.getString("SDT"));
+                        txtTenKhachHang.setText(rs.getString("TenKhachHang"));
+                        rdoNam.setSelected(rs.getInt("GioiTinh") == 1); // 1 for Male
+                        rdoNu.setSelected(rs.getInt("GioiTinh") == 0);  // 0 for Female
+                        txtMaNhanVien.setText(rs.getString("MaNhanVien"));
+
+                        // Fill TongTien and ThanhTien fields directly from HoaDon
+                        txtTongTien.setText(rs.getBigDecimal("TongTien").toString());
+                        txtThanhTien.setText(rs.getBigDecimal("TongTien").toString());
+                    } else {
+                        JOptionPane.showMessageDialog(null, "Không tìm thấy hóa đơn!");
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Lỗi khi truy vấn thông tin hóa đơn: " + e.getMessage());
+        }
     }
 
     private void handleOrderRowClick(int selectedRow, JTable sourceTable) {
@@ -552,6 +608,7 @@ public class BanHangView extends javax.swing.JFrame {
 
     private void btnTaoDonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnTaoDonActionPerformed
         // TODO add your handling code here:
+        clearTextFields();
         createInvoice();
         loadTables();
     }//GEN-LAST:event_btnTaoDonActionPerformed
@@ -615,7 +672,7 @@ public class BanHangView extends javax.swing.JFrame {
 
                 JOptionPane.showMessageDialog(null, "Đã thêm sản phẩm thành công và cập nhật số lượng!");
                 capNhatTongTienChoHoaDon();
-                loadTables();
+                capNhatSoLuongSanPham(idSanPham, soLuong);
             } catch (NumberFormatException e) {
                 JOptionPane.showMessageDialog(null, "Số lượng không hợp lệ! Vui lòng nhập số nguyên.");
             } catch (Exception e) {
@@ -964,7 +1021,7 @@ public class BanHangView extends javax.swing.JFrame {
                 try (PreparedStatement customerPs = connection.prepareStatement(customerSql, Statement.RETURN_GENERATED_KEYS)) {
                     customerPs.setString(1, soDienThoai);
                     customerPs.setString(2, tenKhachHang);
-                    customerPs.setInt(3, isNam ? 1 : 0); // 1 for "Nam", 0 for "Nu"
+                    customerPs.setInt(3, isNam ? 1 : 0); // 1 for "Nam", 0 for "Nữ"
 
                     customerPs.executeUpdate();
                     ResultSet generatedKeys = customerPs.getGeneratedKeys();
@@ -975,13 +1032,15 @@ public class BanHangView extends javax.swing.JFrame {
             }
 
             // Create invoice
-            String invoiceSql = "INSERT INTO HoaDon (MaHoaDon, IDKhachHang, IDNhanVien, NgayTao, TrangThai) VALUES (?, ?, ?, ?, ?)";
+            String invoiceSql = "INSERT INTO HoaDon (MaHoaDon, IDKhachHang, IDNhanVien, NgayTao, TrangThai, TongTien) "
+                    + "VALUES (?, ?, ?, ?, ?, ?)";
             try (PreparedStatement invoicePs = connection.prepareStatement(invoiceSql)) {
-                invoicePs.setString(1, maHoaDon);
-                invoicePs.setInt(2, customerId);
-                invoicePs.setInt(3, Integer.parseInt(maNhanVien));
-                invoicePs.setTimestamp(4, Timestamp.valueOf(formattedNgayTao)); // Pass correctly formatted date
-                invoicePs.setBoolean(5, false); // Unpaid (Chưa thanh toán)
+                invoicePs.setString(1, maHoaDon); // Mã hóa đơn
+                invoicePs.setInt(2, customerId); // ID khách hàng
+                invoicePs.setInt(3, Integer.parseInt(maNhanVien)); // ID nhân viên
+                invoicePs.setTimestamp(4, Timestamp.valueOf(formattedNgayTao)); // Ngày tạo
+                invoicePs.setBoolean(5, false); // Chưa thanh toán (false)
+                invoicePs.setBigDecimal(6, BigDecimal.ZERO); // Set TongTien to 0 initially
 
                 invoicePs.executeUpdate();
                 JOptionPane.showMessageDialog(null, "Tạo hóa đơn thành công!");
