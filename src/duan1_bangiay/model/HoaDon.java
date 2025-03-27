@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package duan1_bangiay.model;
 
 import java.math.BigDecimal;
@@ -14,6 +10,8 @@ public class HoaDon {
     private int idKhachHang; // Foreign key
     private int idPhieuGiamGia; // Foreign key
     private String maHoaDon; // Unique identifier
+    private String maNhanVien; // New field for employee code
+    private String maKhachHang; // New field for customer code
     private BigDecimal tongTien; // Total amount
     private BigDecimal giamGia; // Discount
     private LocalDateTime ngayTao; // Creation date
@@ -24,13 +22,16 @@ public class HoaDon {
     public HoaDon() {
     }
 
-    public HoaDon(int id, int idNhanVien, int idKhachHang, int idPhieuGiamGia, String maHoaDon, BigDecimal tongTien,
-            BigDecimal giamGia, LocalDateTime ngayTao, BigDecimal thanhTien, boolean trangThai) {
+    public HoaDon(int id, int idNhanVien, int idKhachHang, int idPhieuGiamGia, String maHoaDon, String maNhanVien,
+            String maKhachHang, BigDecimal tongTien, BigDecimal giamGia, LocalDateTime ngayTao, BigDecimal thanhTien,
+            boolean trangThai) {
         this.id = id;
         this.idNhanVien = idNhanVien;
         this.idKhachHang = idKhachHang;
         this.idPhieuGiamGia = idPhieuGiamGia;
         this.maHoaDon = maHoaDon;
+        this.maNhanVien = maNhanVien; // Initialize new field
+        this.maKhachHang = maKhachHang; // Initialize new field
         this.tongTien = tongTien;
         this.giamGia = giamGia;
         this.ngayTao = ngayTao;
@@ -79,6 +80,22 @@ public class HoaDon {
         this.maHoaDon = maHoaDon;
     }
 
+    public String getMaNhanVien() { // New getter
+        return maNhanVien;
+    }
+
+    public void setMaNhanVien(String maNhanVien) { // New setter
+        this.maNhanVien = maNhanVien;
+    }
+
+    public String getMaKhachHang() { // New getter
+        return maKhachHang;
+    }
+
+    public void setMaKhachHang(String maKhachHang) { // New setter
+        this.maKhachHang = maKhachHang;
+    }
+
     public BigDecimal getTongTien() {
         return tongTien;
     }
@@ -121,17 +138,19 @@ public class HoaDon {
 
     @Override
     public String toString() {
-        return "HoaDon{"
-                + "id=" + id
-                + ", idNhanVien=" + idNhanVien
-                + ", idKhachHang=" + idKhachHang
-                + ", idPhieuGiamGia=" + idPhieuGiamGia
-                + ", maHoaDon='" + maHoaDon + '\''
-                + ", tongTien=" + tongTien
-                + ", giamGia=" + giamGia
-                + ", ngayTao=" + ngayTao
-                + ", thanhTien=" + thanhTien
-                + ", trangThai=" + trangThai
-                + '}';
+        return "HoaDon{" +
+                "id=" + id +
+                ", idNhanVien=" + idNhanVien +
+                ", idKhachHang=" + idKhachHang +
+                ", idPhieuGiamGia=" + idPhieuGiamGia +
+                ", maHoaDon='" + maHoaDon + '\'' +
+                ", maNhanVien='" + maNhanVien + '\'' + // Include new field in string representation
+                ", maKhachHang='" + maKhachHang + '\'' + // Include new field in string representation
+                ", tongTien=" + tongTien +
+                ", giamGia=" + giamGia +
+                ", ngayTao=" + ngayTao +
+                ", thanhTien=" + thanhTien +
+                ", trangThai=" + trangThai +
+                '}';
     }
 }

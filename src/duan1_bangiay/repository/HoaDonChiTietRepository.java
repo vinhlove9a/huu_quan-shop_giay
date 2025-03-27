@@ -18,8 +18,8 @@ import javax.swing.JOptionPane;
  */
 public class HoaDonChiTietRepository {
 
-    public List<Object[]> fetchOrderDetailsFromDatabase(String maDonHang) {
-        List<Object[]> orderDetails = new ArrayList<>();
+    public List<Object[]> layChiTietDonHangTuCSDL(String maDonHang) {
+        List<Object[]> chiTietDonHang = new ArrayList<>();
         String sql = "SELECT ROW_NUMBER() OVER (ORDER BY cthd.ID) AS STT, "
                 + "sp.TenSanPham AS TenHangHoa, cthd.DonGia, cthd.SoLuong, "
                 + "(cthd.DonGia * cthd.SoLuong) AS ThanhTien "
@@ -34,23 +34,23 @@ public class HoaDonChiTietRepository {
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    Object[] row = new Object[]{
-                        rs.getInt("STT"), // Serial Number
-                        rs.getString("TenHangHoa"), // Product Name
-                        rs.getBigDecimal("DonGia"), // Unit Price
-                        rs.getInt("SoLuong"), // Quantity
-                        rs.getBigDecimal("ThanhTien") // Total Price
+                    Object[] dong = new Object[]{ // Adjust variable name too
+                        rs.getInt("STT"),
+                        rs.getString("TenHangHoa"),
+                        rs.getBigDecimal("DonGia"),
+                        rs.getInt("SoLuong"),
+                        rs.getBigDecimal("ThanhTien")
                     };
-                    orderDetails.add(row);
+                    chiTietDonHang.add(dong);
                 }
             }
 
         } catch (SQLException e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(null, "Error fetching order details: " + e.getMessage());
+            JOptionPane.showMessageDialog(null, "Lỗi lấy chi tiết đơn hàng: " + e.getMessage());
         }
 
-        return orderDetails;
+        return chiTietDonHang;
     }
 
     public void saveProductToInvoice(String maDonHang, String maSanPham, int soLuong, BigDecimal donGia) {
@@ -68,6 +68,23 @@ public class HoaDonChiTietRepository {
 
         } catch (SQLException e) {
             e.printStackTrace();
+        }
+    }
+
+    public void insertIntoChiTietHoaDon(String maHoaDon, String maSP, int soLuong, BigDecimal donGia) {
+        String sql = "INSERT INTO ChiTietHoaDon (IDHoaDon, IDSanPham, SoLuong, DonGia, TrangThai) "
+                + "VALUES ((SELECT ID FROM HoaDon WHERE MaHoaDon = ?), "
+                + "(SELECT ID FROM SanPham WHERE MaSanPham = ?), ?, ?, 1)";
+
+        try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, maHoaDon);
+            ps.setString(2, maSP);
+            ps.setInt(3, soLuong);
+            ps.setBigDecimal(4, donGia);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Lỗi thêm sản phẩm vào hóa đơn chi tiết: " + e.getMessage());
         }
     }
 }

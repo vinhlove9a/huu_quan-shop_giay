@@ -9,6 +9,7 @@ import duan1_bangiay.repository.HoaDonChiTietRepository;
 import duan1_bangiay.repository.HoaDonRepository;
 import duan1_bangiay.repository.SanPhamRepository;
 import duan1_bangiay.utils.DBConnect;
+import java.math.BigDecimal;
 import java.util.List;
 import javax.swing.JTable;
 import javax.swing.table.DefaultTableModel;
@@ -16,6 +17,8 @@ import java.sql.*;
 import javax.swing.JOptionPane;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Arrays;
 
 /**
  *
@@ -26,6 +29,8 @@ public class BanHangView extends javax.swing.JFrame {
     /**
      * Creates new form BanHangVIEW
      */
+    private String maHoaDonHienTai = null; // Biến toàn cục để lưu mã hóa đơn hiện tại
+
     public BanHangView() {
         initComponents();
         loadTables();
@@ -34,6 +39,7 @@ public class BanHangView extends javax.swing.JFrame {
         txtNgayTao.setText(java.time.LocalDateTime.now().toString());
         txtMaNhanVien.setText(txtMaNhanVien.getText());
         txtSoDienThoai.addActionListener(e -> checkAndFillCustomerDetails(txtSoDienThoai.getText()));
+
     }
 
     private void searchListener() {
@@ -56,10 +62,12 @@ public class BanHangView extends javax.swing.JFrame {
     }
 
     private void donHangListener() {
+
         tblChuaThanhToan.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseClicked(java.awt.event.MouseEvent evt) {
                 int selectedRow = tblChuaThanhToan.getSelectedRow();
+
                 if (selectedRow != -1) {
                     handleOrderRowClick(selectedRow, tblChuaThanhToan);
                 }
@@ -78,22 +86,35 @@ public class BanHangView extends javax.swing.JFrame {
     }
 
     private void handleOrderRowClick(int selectedRow, JTable sourceTable) {
-        // Get the source table's model
-        DefaultTableModel sourceModel = (DefaultTableModel) sourceTable.getModel();
-        DefaultTableModel gioHangModel = (DefaultTableModel) tblHoaDonChiTiet.getModel();
-        HoaDonChiTietRepository hoaDonChiTietRepository = new HoaDonChiTietRepository();
-        // Extract Mã Đơn Hàng (Order ID) from the selected row
-        String maDonHang = (String) sourceModel.getValueAt(selectedRow, 0); // Assuming column 0 is "Mã Đơn Hàng"
+        try {
+            DefaultTableModel sourceModel = (DefaultTableModel) sourceTable.getModel();
+            maHoaDonHienTai = sourceModel.getValueAt(selectedRow, 0).toString(); // Lấy mã hóa đơn hiện tại
+            System.out.println("Mã Hóa Đơn Hiện Tại: " + maHoaDonHienTai);
 
-        // Fetch order details from the database
-        List<Object[]> orderDetails = hoaDonChiTietRepository.fetchOrderDetailsFromDatabase(maDonHang);
+            // Cập nhật bảng tblHoaDonChiTiet
+            capNhatChiTietHoaDon(maHoaDonHienTai);
+            tinhTongTienTuTblHoaDonChiTiet();
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Lỗi khi xử lý hàng đơn: " + e.getMessage());
+        }
+    }
 
-        // Clear existing rows in tblGioHang
-        gioHangModel.setRowCount(0);
+    private void capNhatChiTietHoaDon(String maHoaDon) {
+        List<Object[]> danhSachChiTiet = layDanhSachChiTietHoaDonTuCSDL(maHoaDon);
 
-        // Populate tblGioHang with the fetched order details
-        for (Object[] row : orderDetails) {
-            gioHangModel.addRow(row);
+        // Cập nhật tblHoaDonChiTiet
+        DefaultTableModel model = (DefaultTableModel) tblHoaDonChiTiet.getModel();
+        model.setRowCount(0); // Xóa dữ liệu cũ
+
+        for (Object[] dong : danhSachChiTiet) {
+            model.addRow(dong); // Thêm dữ liệu mới
+        }
+
+        if (danhSachChiTiet.isEmpty()) {
+            JOptionPane.showMessageDialog(null, "Không có chi tiết hóa đơn cho mã: " + maHoaDon);
+        } else {
+            JOptionPane.showMessageDialog(null, "Đã tải chi tiết hóa đơn cho mã: " + maHoaDon);
         }
     }
 
@@ -110,7 +131,7 @@ public class BanHangView extends javax.swing.JFrame {
         jScrollPane2 = new javax.swing.JScrollPane();
         tblHoaDonChiTiet = new javax.swing.JTable();
         jScrollPane3 = new javax.swing.JScrollPane();
-        tblThongTinSanPham = new javax.swing.JTable();
+        tblSanPham = new javax.swing.JTable();
         jLabel1 = new javax.swing.JLabel();
         btnHuyDon = new javax.swing.JButton();
         btnTaoDon = new javax.swing.JButton();
@@ -152,6 +173,7 @@ public class BanHangView extends javax.swing.JFrame {
         txtMaHoaDon = new javax.swing.JTextField();
         jLabel16 = new javax.swing.JLabel();
         jLabel17 = new javax.swing.JLabel();
+        lblTongTien = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setAutoRequestFocus(false);
@@ -167,7 +189,7 @@ public class BanHangView extends javax.swing.JFrame {
         ));
         jScrollPane2.setViewportView(tblHoaDonChiTiet);
 
-        tblThongTinSanPham.setModel(new javax.swing.table.DefaultTableModel(
+        tblSanPham.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
 
             },
@@ -175,7 +197,12 @@ public class BanHangView extends javax.swing.JFrame {
                 "STT", "Mã SP", "Tên SP", "Thương Hiệu", "Giá Bán", "Số Lượng", "Size", "Màu Sắc"
             }
         ));
-        jScrollPane3.setViewportView(tblThongTinSanPham);
+        tblSanPham.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                tblSanPhamMouseClicked(evt);
+            }
+        });
+        jScrollPane3.setViewportView(tblSanPham);
 
         jLabel1.setFont(new java.awt.Font("Segoe UI", 1, 30)); // NOI18N
         jLabel1.setForeground(new java.awt.Color(0, 153, 153));
@@ -238,6 +265,11 @@ public class BanHangView extends javax.swing.JFrame {
                 "Mã Hóa Đơn", "Mã Khách Hàng", "Mã Nhân Viên", "Mã Giảm Giá", "Ngày Mua", "Tổng Tiền"
             }
         ));
+        tblChuaThanhToan.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                tblChuaThanhToanMouseClicked(evt);
+            }
+        });
         jScrollPane4.setViewportView(tblChuaThanhToan);
 
         tblHoaDon.addTab("Chưa thanh toán", jScrollPane4);
@@ -427,7 +459,10 @@ public class BanHangView extends javax.swing.JFrame {
                         .addContainerGap()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 673, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(jLabel17))
+                            .addGroup(layout.createSequentialGroup()
+                                .addComponent(jLabel17)
+                                .addGap(9, 9, 9)
+                                .addComponent(lblTongTien)))
                         .addGap(18, 18, 18)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addGroup(layout.createSequentialGroup()
@@ -481,7 +516,9 @@ public class BanHangView extends javax.swing.JFrame {
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(layout.createSequentialGroup()
                         .addGap(6, 6, 6)
-                        .addComponent(jLabel17)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(jLabel17)
+                            .addComponent(lblTongTien))
                         .addGap(31, 31, 31)
                         .addComponent(jLabel11)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
@@ -535,6 +572,149 @@ public class BanHangView extends javax.swing.JFrame {
         // TODO add your handling code here:
     }//GEN-LAST:event_rdoNamActionPerformed
 
+    private void tblSanPhamMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tblSanPhamMouseClicked
+
+        if (maHoaDonHienTai == null) {
+            JOptionPane.showMessageDialog(null, "Chưa chọn hóa đơn để thêm sản phẩm!");
+            return; // Exit if no order is selected
+        }
+
+        int row = tblSanPham.getSelectedRow();
+        if (row != -1) {
+            try {
+                // Retrieve product details from the selected row
+                String maSP = tblSanPham.getValueAt(row, 1).toString(); // Mã SP
+                String tenSP = tblSanPham.getValueAt(row, 2).toString(); // Tên SP
+                BigDecimal donGia = new BigDecimal(tblSanPham.getValueAt(row, 4).toString()); // Giá Bán
+
+                // Prompt for the quantity
+                String soLuongStr = JOptionPane.showInputDialog("Nhập số lượng cho sản phẩm: " + tenSP);
+                if (soLuongStr == null || soLuongStr.trim().isEmpty()) {
+                    JOptionPane.showMessageDialog(null, "Bạn chưa nhập số lượng!");
+                    return;
+                }
+
+                // Parse and validate the quantity input
+                int soLuong = Integer.parseInt(soLuongStr.trim());
+                if (soLuong <= 0) {
+                    JOptionPane.showMessageDialog(null, "Số lượng phải lớn hơn 0!");
+                    return;
+                }
+
+                // Add product to ChiTietHoaDon table in the database
+                themSanPhamVaoChiTietHoaDon(maHoaDonHienTai, maSP, soLuong, donGia);
+
+                // Update product quantity in ChiTietSanPham and refresh the table
+                int idSanPham = getIdSanPhamFromMaSP(maSP); // Add a helper method to map MaSP to ID
+                capNhatSoLuongSanPham(idSanPham, soLuong);
+
+                // Refresh tblHoaDonChiTiet and tblSanPham
+                capNhatChiTietHoaDon(maHoaDonHienTai);
+                SanPhamRepository sanPhamRepository = new SanPhamRepository();
+                sanPhamRepository.getAllSanPham();
+
+                JOptionPane.showMessageDialog(null, "Đã thêm sản phẩm thành công và cập nhật số lượng!");
+                capNhatTongTienChoHoaDon();
+                loadTables();
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(null, "Số lượng không hợp lệ! Vui lòng nhập số nguyên.");
+            } catch (Exception e) {
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(null, "Đã xảy ra lỗi khi thêm sản phẩm: " + e.getMessage());
+            }
+        }
+    }
+
+    private int getIdSanPhamFromMaSP(String maSP) {
+        // Query to retrieve ID corresponding to MaSP
+        String sql = "SELECT ID FROM SanPham WHERE MaSanPham = ?";
+        try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, maSP);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("ID");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Lỗi khi lấy ID cho sản phẩm: " + e.getMessage());
+        }
+        return -1; // Return -1 if ID not found
+
+
+    }//GEN-LAST:event_tblSanPhamMouseClicked
+    public void themSanPhamVaoChiTietHoaDon(String maHoaDon, String maSP, int soLuong, BigDecimal donGia) {
+        String sql = "INSERT INTO ChiTietHoaDon (IDHoaDon, IDSanPham, SoLuong, DonGia, TrangThai) "
+                + "VALUES ((SELECT ID FROM HoaDon WHERE MaHoaDon = ?), "
+                + "(SELECT ID FROM SanPham WHERE MaSanPham = ?), ?, ?, 1)";
+
+        try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, maHoaDon);
+            ps.setString(2, maSP);
+            ps.setInt(3, soLuong);
+            ps.setBigDecimal(4, donGia);
+            ps.executeUpdate();
+            //JOptionPane.showMessageDialog(null, "Đã thêm sản phẩm vào hóa đơn chi tiết!");
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Lỗi khi thêm sản phẩm: " + e.getMessage());
+        }
+    }
+
+    public void capNhatSoLuongSanPham(int idSanPham, int soLuongBan) {
+        String sql = "UPDATE ChiTietSanPham SET SoLuong = CASE WHEN SoLuong >= ? THEN SoLuong - ? ELSE SoLuong END WHERE ID = ?";
+        try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setInt(1, soLuongBan); // Ensure the product has enough stock
+            ps.setInt(2, soLuongBan); // Deduct the stock
+            ps.setInt(3, idSanPham);  // Reference by IDSanPham
+            int rowsAffected = ps.executeUpdate();
+
+            if (rowsAffected > 0) {
+                SanPhamRepository sanPhamRepository = new SanPhamRepository();
+                sanPhamRepository.getAllSanPham();
+                loadTables();
+            } else {
+                JOptionPane.showMessageDialog(null, "Cập nhật thất bại! Sản phẩm có thể không tồn tại hoặc không đủ số lượng.");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Lỗi khi cập nhật số lượng sản phẩm: " + e.getMessage());
+        }
+    }
+
+    public List<Object[]> layDanhSachChiTietHoaDonTuCSDL(String maHoaDon) {
+        List<Object[]> danhSachChiTiet = new ArrayList<>();
+        String sql = "SELECT ROW_NUMBER() OVER (ORDER BY cthd.ID) AS STT, "
+                + "sp.TenSanPham, cthd.DonGia, cthd.SoLuong, "
+                + "(cthd.DonGia * cthd.SoLuong) AS ThanhTien "
+                + "FROM ChiTietHoaDon cthd "
+                + "JOIN SanPham sp ON cthd.IDSanPham = sp.ID "
+                + "JOIN HoaDon hd ON cthd.IDHoaDon = hd.ID "
+                + "WHERE hd.MaHoaDon = ?";
+
+        try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, maHoaDon);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    danhSachChiTiet.add(new Object[]{
+                        rs.getInt("STT"),
+                        rs.getString("TenSanPham"),
+                        rs.getBigDecimal("DonGia"),
+                        rs.getInt("SoLuong"),
+                        rs.getBigDecimal("ThanhTien")
+                    });
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Lỗi khi lấy chi tiết hóa đơn: " + e.getMessage());
+        }
+        return danhSachChiTiet;
+    }
+    private void tblChuaThanhToanMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tblChuaThanhToanMouseClicked
+        // TODO add your handling code here:
+
+    }//GEN-LAST:event_tblChuaThanhToanMouseClicked
+
     /**
      * @param args the command line arguments
      */
@@ -549,16 +729,24 @@ public class BanHangView extends javax.swing.JFrame {
                 if ("Nimbus".equals(info.getName())) {
                     javax.swing.UIManager.setLookAndFeel(info.getClassName());
                     break;
+
                 }
             }
         } catch (ClassNotFoundException ex) {
-            java.util.logging.Logger.getLogger(BanHangView.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+            java.util.logging.Logger.getLogger(BanHangView.class
+                    .getName()).log(java.util.logging.Level.SEVERE, null, ex);
+
         } catch (InstantiationException ex) {
-            java.util.logging.Logger.getLogger(BanHangView.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+            java.util.logging.Logger.getLogger(BanHangView.class
+                    .getName()).log(java.util.logging.Level.SEVERE, null, ex);
+
         } catch (IllegalAccessException ex) {
-            java.util.logging.Logger.getLogger(BanHangView.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+            java.util.logging.Logger.getLogger(BanHangView.class
+                    .getName()).log(java.util.logging.Level.SEVERE, null, ex);
+
         } catch (javax.swing.UnsupportedLookAndFeelException ex) {
-            java.util.logging.Logger.getLogger(BanHangView.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+            java.util.logging.Logger.getLogger(BanHangView.class
+                    .getName()).log(java.util.logging.Level.SEVERE, null, ex);
         }
         //</editor-fold>
         //</editor-fold>
@@ -603,13 +791,14 @@ public class BanHangView extends javax.swing.JFrame {
     private javax.swing.JScrollPane jScrollPane3;
     private javax.swing.JScrollPane jScrollPane4;
     private javax.swing.JScrollPane jScrollPane5;
+    private javax.swing.JLabel lblTongTien;
     private javax.swing.JRadioButton rdoNam;
     private javax.swing.JRadioButton rdoNu;
     private javax.swing.JTable tblChuaThanhToan;
     private javax.swing.JTable tblDaThanhToan;
     private javax.swing.JTabbedPane tblHoaDon;
     private javax.swing.JTable tblHoaDonChiTiet;
-    private javax.swing.JTable tblThongTinSanPham;
+    private javax.swing.JTable tblSanPham;
     private javax.swing.JTextField txtMaHoaDon;
     private javax.swing.JTextField txtMaNhanVien;
     private javax.swing.JTextField txtNgayTao;
@@ -627,7 +816,7 @@ public class BanHangView extends javax.swing.JFrame {
         DefaultTableModel modelDaThanhToan = (DefaultTableModel) tblDaThanhToan.getModel();
 
         // Model for the SanPham table
-        DefaultTableModel modelSanPham = (DefaultTableModel) tblThongTinSanPham.getModel();
+        DefaultTableModel modelSanPham = (DefaultTableModel) tblSanPham.getModel();
 
         // Create repository instances
         HoaDonRepository hoaDonRepository = new HoaDonRepository();
@@ -658,8 +847,8 @@ public class BanHangView extends javax.swing.JFrame {
             for (HoaDon hoaDon : hoaDonList) {
                 tableModel.addRow(new Object[]{
                     hoaDon.getMaHoaDon(), // Mã Hóa Đơn
-                    hoaDon.getIdKhachHang(), // Mã Khách Hàng
-                    hoaDon.getIdNhanVien(), // Mã Nhân Viên
+                    hoaDon.getMaKhachHang(), // Mã Khách Hàng
+                    hoaDon.getMaNhanVien(), // Mã Nhân Viên
                     hoaDon.getIdPhieuGiamGia(), // Mã Giảm Giá
                     hoaDon.getNgayTao(), // Ngày Mua
                     hoaDon.getTongTien() // Tổng Tiền
@@ -687,7 +876,7 @@ public class BanHangView extends javax.swing.JFrame {
         String keyword = txtTimKiem.getText().trim();
 
         // Get the table model
-        DefaultTableModel modelSanPham = (DefaultTableModel) tblThongTinSanPham.getModel();
+        DefaultTableModel modelSanPham = (DefaultTableModel) tblSanPham.getModel();
 
         // Create repository instance
         SanPhamRepository repository = new SanPhamRepository();
@@ -698,12 +887,7 @@ public class BanHangView extends javax.swing.JFrame {
         // Fill the table with search results
         fillToTableSanPham(modelSanPham, searchResults);
     }
-
     //////Tao hoa don
-    private String generateMaHoaDon() {
-        String maHoaDon = "HD" + System.currentTimeMillis(); // Example using timestamp
-        return maHoaDon;
-    }
 
     private void checkAndFillCustomerDetails(String soDienThoai) {
         String sql = "SELECT TenKhachHang, GioiTinh FROM KhachHang WHERE SDT = ?";
@@ -822,5 +1006,69 @@ public class BanHangView extends javax.swing.JFrame {
             }
         }
         return -1; // Return invalid ID if customer doesn't exist
+    }
+
+    public void addToInvoiceDetails(String maSP, String tenSP, BigDecimal giaBan, int soLuong) {
+        // Calculate total price
+
+        // Add product to the invoice table (model)
+        HoaDonChiTietRepository hoaDonChiTietRepository = new HoaDonChiTietRepository();
+        hoaDonChiTietRepository.insertIntoChiTietHoaDon(maSP, maSP, soLuong, giaBan);
+    }
+
+    private BigDecimal tinhTongTienTuTblHoaDonChiTiet() {
+        BigDecimal tongTien = BigDecimal.ZERO; // Khởi tạo tổng tiền ban đầu là 0
+        DefaultTableModel model = (DefaultTableModel) tblHoaDonChiTiet.getModel();
+        if (model.getRowCount() == 0) {
+            lblTongTien.setText(" 0 VND");
+            return tongTien;
+        }
+
+        for (int i = 0; i < model.getRowCount(); i++) {
+            Object thanhTienObj = model.getValueAt(i, 4); // Cột 4 là "ThanhTien"
+            if (thanhTienObj != null) {
+                BigDecimal thanhTien = new BigDecimal(thanhTienObj.toString());
+                tongTien = tongTien.add(thanhTien); // Cộng từng giá trị "ThanhTien" vào tổng
+                lblTongTien.setText(tongTien.compareTo(BigDecimal.ZERO) > 0
+                        ? tongTien.toString() + " VND"
+                        : " 0 VND");
+            }
+        }
+
+        return tongTien;
+    }
+
+    private void luuTongTienVaoHoaDon(BigDecimal tongTien, String maHoaDon) {
+        String sql = "UPDATE HoaDon SET TongTien = ? WHERE MaHoaDon = ?";
+
+        try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
+
+            ps.setBigDecimal(1, tongTien); // Gán tổng tiền vào tham số đầu tiên
+            ps.setString(2, maHoaDon);    // Gán mã hóa đơn vào tham số thứ hai
+
+            int rowsAffected = ps.executeUpdate(); // Thực thi câu lệnh SQL
+            if (rowsAffected > 0) {
+                JOptionPane.showMessageDialog(null, "Đã cập nhật tổng tiền thành công!");
+            } else {
+                JOptionPane.showMessageDialog(null, "Cập nhật thất bại! Mã hóa đơn không tồn tại.");
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Lỗi khi lưu tổng tiền vào hóa đơn: " + e.getMessage());
+        }
+    }
+
+    private void capNhatTongTienChoHoaDon() {
+        if (maHoaDonHienTai == null) {
+            JOptionPane.showMessageDialog(null, "Chưa chọn hóa đơn để cập nhật tổng tiền!");
+            return;
+        }
+
+        // Tính tổng tiền từ tblHoaDonChiTiet
+        BigDecimal tongTien = tinhTongTienTuTblHoaDonChiTiet();
+
+        // Lưu tổng tiền vào bảng HoaDon
+        luuTongTienVaoHoaDon(tongTien, maHoaDonHienTai);
     }
 }

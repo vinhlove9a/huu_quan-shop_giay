@@ -19,15 +19,18 @@ public class HoaDonRepository {
 
     public List<HoaDon> getHoaDonChuaThanhToan() {
         List<HoaDon> unpaidInvoices = new ArrayList<>();
-        String sql = "SELECT MaHoaDon, IDKhachHang, IDNhanVien, IDPhieuGiamGia, NgayTao, TongTien "
-                + "FROM HoaDon WHERE TrangThai = 0"; // TrangThai = 1 for "Chưa thanh toán"
+        String sql = "SELECT MaHoaDon, MaKhachHang, MaNhanVien, IDPhieuGiamGia, NgayTao, TongTien "
+                + "FROM HoaDon "
+                + "JOIN KhachHang ON HoaDon.IDKhachHang = KhachHang.ID "
+                + "JOIN NhanVien ON HoaDon.IDNhanVien = NhanVien.ID "
+                + "WHERE HoaDon.TrangThai = 0"; // TrangThai = 0 for "Chưa thanh toán"
 
         try (Connection connection = DBConnect.getConnection(); Statement statement = connection.createStatement(); ResultSet resultSet = statement.executeQuery(sql)) {
             while (resultSet.next()) {
                 HoaDon hoaDon = new HoaDon();
                 hoaDon.setMaHoaDon(resultSet.getString("MaHoaDon"));
-                hoaDon.setIdKhachHang(resultSet.getInt("IDKhachHang"));
-                hoaDon.setIdNhanVien(resultSet.getInt("IDNhanVien"));
+                hoaDon.setMaKhachHang(resultSet.getString("MaKhachHang"));
+                hoaDon.setMaNhanVien(resultSet.getString("MaNhanVien"));
                 hoaDon.setIdPhieuGiamGia(resultSet.getInt("IDPhieuGiamGia"));
                 hoaDon.setNgayTao(resultSet.getTimestamp("NgayTao").toLocalDateTime());
                 hoaDon.setTongTien(resultSet.getBigDecimal("TongTien"));
@@ -42,15 +45,18 @@ public class HoaDonRepository {
 
     public List<HoaDon> getHoaDonDaThanhToan() {
         List<HoaDon> paidInvoices = new ArrayList<>();
-        String sql = "SELECT MaHoaDon, IDKhachHang, IDNhanVien, IDPhieuGiamGia, NgayTao, TongTien "
-                + "FROM HoaDon WHERE TrangThai = 1"; // TrangThai = 0 for "Đã thanh toán"
+        String sql = "SELECT MaHoaDon, MaKhachHang, MaNhanVien, IDPhieuGiamGia, NgayTao, TongTien "
+                + "FROM HoaDon "
+                + "JOIN KhachHang ON HoaDon.IDKhachHang = KhachHang.ID "
+                + "JOIN NhanVien ON HoaDon.IDNhanVien = NhanVien.ID "
+                + "WHERE HoaDon.TrangThai = 1"; // TrangThai = 1 for "Đã thanh toán"
 
         try (Connection connection = DBConnect.getConnection(); Statement statement = connection.createStatement(); ResultSet resultSet = statement.executeQuery(sql)) {
             while (resultSet.next()) {
                 HoaDon hoaDon = new HoaDon();
                 hoaDon.setMaHoaDon(resultSet.getString("MaHoaDon"));
-                hoaDon.setIdKhachHang(resultSet.getInt("IDKhachHang"));
-                hoaDon.setIdNhanVien(resultSet.getInt("IDNhanVien"));
+                hoaDon.setMaKhachHang(resultSet.getString("MaKhachHang"));
+                hoaDon.setMaNhanVien(resultSet.getString("MaNhanVien"));
                 hoaDon.setIdPhieuGiamGia(resultSet.getInt("IDPhieuGiamGia"));
                 hoaDon.setNgayTao(resultSet.getTimestamp("NgayTao").toLocalDateTime());
                 hoaDon.setTongTien(resultSet.getBigDecimal("TongTien"));
@@ -62,6 +68,5 @@ public class HoaDonRepository {
 
         return paidInvoices;
     }
-
     
 }
