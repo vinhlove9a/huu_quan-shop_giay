@@ -19,6 +19,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 
 /**
  *
@@ -39,7 +41,22 @@ public class BanHangView extends javax.swing.JFrame {
         txtNgayTao.setText(java.time.LocalDateTime.now().toString());
         txtMaNhanVien.setText(txtMaNhanVien.getText());
         txtSoDienThoai.addActionListener(e -> checkAndFillCustomerDetails(txtSoDienThoai.getText()));
+        txtSoTienTra.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                tinhTienDu();
+            }
 
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                tinhTienDu();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                tinhTienDu();
+            }
+        });
     }
 
     private void searchListener() {
@@ -87,6 +104,11 @@ public class BanHangView extends javax.swing.JFrame {
         });
     }
 
+    private void clearGioHang() {
+        DefaultTableModel tblGioHang = (DefaultTableModel) tblHoaDonChiTiet.getModel();
+        tblGioHang.setRowCount(0);
+    }
+
     private void clearTextFields() {
         txtMaHoaDon.setText(""); // Clear Mã Hóa Đơn
         txtSoDienThoai.setText(""); // Clear Số Điện Thoại
@@ -94,6 +116,8 @@ public class BanHangView extends javax.swing.JFrame {
         txtMaNhanVien.setText(""); // Clear Mã Nhân Viên
         txtTongTien.setText("");
         txtThanhTien.setText("");
+        txtSoTienTra.setText("");
+        txtTienDu.setText("");
         // Reset radio buttons (assuming there are male and female options)
         rdoNam.setSelected(false);
         rdoNu.setSelected(false);
@@ -126,10 +150,11 @@ public class BanHangView extends javax.swing.JFrame {
                         rdoNam.setSelected(rs.getInt("GioiTinh") == 1); // 1 for Male
                         rdoNu.setSelected(rs.getInt("GioiTinh") == 0);  // 0 for Female
                         txtMaNhanVien.setText(rs.getString("MaNhanVien"));
+                        BigDecimal tongTien = rs.getBigDecimal("TongTien");
+                        BigDecimal thanhTien = rs.getBigDecimal("TongTien");
+                        txtTongTien.setText(tongTien != null ? tongTien.toString() : "");
+                        txtThanhTien.setText(thanhTien != null ? thanhTien.toString() : "");
 
-                        // Fill TongTien and ThanhTien fields directly from HoaDon
-                        txtTongTien.setText(rs.getBigDecimal("TongTien").toString());
-                        txtThanhTien.setText(rs.getBigDecimal("TongTien").toString());
                     } else {
                         JOptionPane.showMessageDialog(null, "Không tìm thấy hóa đơn!");
                     }
@@ -170,7 +195,7 @@ public class BanHangView extends javax.swing.JFrame {
         if (danhSachChiTiet.isEmpty()) {
             JOptionPane.showMessageDialog(null, "Không có chi tiết hóa đơn cho mã: " + maHoaDon);
         } else {
-            JOptionPane.showMessageDialog(null, "Đã tải chi tiết hóa đơn cho mã: " + maHoaDon);
+            //khong nhap
         }
     }
 
@@ -608,6 +633,7 @@ public class BanHangView extends javax.swing.JFrame {
 
     private void btnTaoDonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnTaoDonActionPerformed
         // TODO add your handling code here:
+        clearGioHang();
         clearTextFields();
         createInvoice();
         loadTables();
@@ -615,6 +641,61 @@ public class BanHangView extends javax.swing.JFrame {
 
     private void btnThanhToanActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnThanhToanActionPerformed
         // TODO add your handling code here:
+        try {
+            // Validate essential fields
+            String maHoaDon = txtMaHoaDon.getText().trim();
+            String thanhTienStr = txtThanhTien.getText().trim(); // Thành Tiền
+            String soTienTraStr = txtSoTienTra.getText().trim(); // Số Tiền Trả
+
+            if (maHoaDon.isEmpty() || thanhTienStr.isEmpty() || soTienTraStr.isEmpty()) {
+                JOptionPane.showMessageDialog(null, "Vui lòng điền đầy đủ thông tin trước khi thanh toán!");
+                return;
+            }
+
+            // Convert values to BigDecimal for calculations
+            BigDecimal thanhTien = new BigDecimal(thanhTienStr);
+            BigDecimal soTienTra = new BigDecimal(soTienTraStr);
+
+            // Calculate Tiền Dư (Change Due)
+            BigDecimal tienDu = soTienTra.subtract(thanhTien);
+
+            // Check if payment is sufficient
+            if (tienDu.compareTo(BigDecimal.ZERO) < 0) {
+                JOptionPane.showMessageDialog(null, "Số tiền trả không đủ để thanh toán hóa đơn!");
+                return;
+            }
+
+            // Update Tiền Dư field in UI
+            txtTienDu.setText(tienDu.toString());
+
+            // Update database: HoaDon table
+            String sql = "UPDATE HoaDon SET TongTien = ?, GiamGia = ?, ThanhTien = ?, TrangThai = ? WHERE MaHoaDon = ?";
+            try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
+                ps.setBigDecimal(1, thanhTien); // Total amount
+                ps.setBigDecimal(2, BigDecimal.ZERO); // Discount, assumed to be 0 for simplicity
+                ps.setBigDecimal(3, thanhTien); // Final amount after applying discounts
+                ps.setBoolean(4, true);        // Mark invoice as paid
+                ps.setString(5, maHoaDon);     // Invoice code
+
+                int rowsAffected = ps.executeUpdate();
+                if (rowsAffected > 0) {
+                    JOptionPane.showMessageDialog(null, "Thanh toán thành công!");
+
+                    // Move invoice to "Đã Thanh Toán" tab and refresh UI
+                    loadTables();
+                    clearTextFields(); // Reset form
+                } else {
+                    JOptionPane.showMessageDialog(null, "Không tìm thấy hóa đơn để cập nhật!");
+                }
+            }
+
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(null, "Số tiền không hợp lệ! Vui lòng nhập số.");
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Lỗi khi cập nhật hóa đơn: " + e.getMessage());
+        }
+
     }//GEN-LAST:event_btnThanhToanActionPerformed
 
     private void txtTimKiemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_txtTimKiemActionPerformed
@@ -1091,6 +1172,8 @@ public class BanHangView extends javax.swing.JFrame {
                 lblTongTien.setText(tongTien.compareTo(BigDecimal.ZERO) > 0
                         ? tongTien.toString() + " VND"
                         : " 0 VND");
+                txtTongTien.setText(tongTien.toString());
+                txtThanhTien.setText(tongTien.toString());
             }
         }
 
@@ -1129,5 +1212,23 @@ public class BanHangView extends javax.swing.JFrame {
 
         // Lưu tổng tiền vào bảng HoaDon
         luuTongTienVaoHoaDon(tongTien, maHoaDonHienTai);
+    }
+
+    private void tinhTienDu() {
+        try {
+            // Get the values from the text fields
+            BigDecimal thanhTien = new BigDecimal(txtThanhTien.getText().trim()); // Thành Tiền
+            BigDecimal soTienTra = new BigDecimal(txtSoTienTra.getText().trim()); // Số Tiền Trả
+
+            // Calculate Tiền Dư (Change Due)
+            BigDecimal tienDu = soTienTra.subtract(thanhTien);
+
+            // Update Tiền Dư field
+            txtTienDu.setText(tienDu.toString());
+        } catch (NumberFormatException e) {
+            // Handle invalid or empty input
+            txtTienDu.setText(""); // Clear Tiền Dư field if input is invalid
+            System.err.println("Lỗi định dạng số: " + e.getMessage());
+        }
     }
 }
