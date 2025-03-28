@@ -633,8 +633,6 @@ public class BanHangView extends javax.swing.JFrame {
 
     private void btnTaoDonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnTaoDonActionPerformed
         // TODO add your handling code here:
-        clearGioHang();
-        clearTextFields();
         createInvoice();
         loadTables();
     }//GEN-LAST:event_btnTaoDonActionPerformed
@@ -674,7 +672,7 @@ public class BanHangView extends javax.swing.JFrame {
                 ps.setBigDecimal(1, thanhTien); // Total amount
                 ps.setBigDecimal(2, BigDecimal.ZERO); // Discount, assumed to be 0 for simplicity
                 ps.setBigDecimal(3, thanhTien); // Final amount after applying discounts
-                ps.setBoolean(4, true);        // Mark invoice as paid
+                ps.setInt(4, 1);        // Mark invoice as paid
                 ps.setString(5, maHoaDon);     // Invoice code
 
                 int rowsAffected = ps.executeUpdate();
@@ -684,6 +682,7 @@ public class BanHangView extends javax.swing.JFrame {
                     // Move invoice to "Đã Thanh Toán" tab and refresh UI
                     loadTables();
                     clearTextFields(); // Reset form
+                    clearGioHang();
                 } else {
                     JOptionPane.showMessageDialog(null, "Không tìm thấy hóa đơn để cập nhật!");
                 }
@@ -717,6 +716,13 @@ public class BanHangView extends javax.swing.JFrame {
             return; // Exit if no order is selected
         }
 
+// Check if the invoice has already been paid
+        boolean daThanhToan = kiemTraTrangThaiHoaDon(maHoaDonHienTai);
+        if (daThanhToan) {
+            JOptionPane.showMessageDialog(null, "Không thể thêm sản phẩm vào hóa đơn đã thanh toán!");
+            return;
+        }
+
         int row = tblSanPham.getSelectedRow();
         if (row != -1) {
             try {
@@ -743,7 +749,7 @@ public class BanHangView extends javax.swing.JFrame {
                 themSanPhamVaoChiTietHoaDon(maHoaDonHienTai, maSP, soLuong, donGia);
 
                 // Update product quantity in ChiTietSanPham and refresh the table
-                int idSanPham = getIdSanPhamFromMaSP(maSP); // Add a helper method to map MaSP to ID
+                int idSanPham = getIdSanPhamFromMaSP(maSP);
                 capNhatSoLuongSanPham(idSanPham, soLuong);
 
                 // Refresh tblHoaDonChiTiet and tblSanPham
@@ -1121,7 +1127,7 @@ public class BanHangView extends javax.swing.JFrame {
                 invoicePs.setInt(3, Integer.parseInt(maNhanVien)); // ID nhân viên
                 invoicePs.setTimestamp(4, Timestamp.valueOf(formattedNgayTao)); // Ngày tạo
                 invoicePs.setBoolean(5, false); // Chưa thanh toán (false)
-                invoicePs.setBigDecimal(6, BigDecimal.ZERO); // Set TongTien to 0 initially
+                invoicePs.setBigDecimal(6, null); // Set TongTien to 0 initially
 
                 invoicePs.executeUpdate();
                 JOptionPane.showMessageDialog(null, "Tạo hóa đơn thành công!");
@@ -1229,6 +1235,28 @@ public class BanHangView extends javax.swing.JFrame {
             // Handle invalid or empty input
             txtTienDu.setText(""); // Clear Tiền Dư field if input is invalid
             System.err.println("Lỗi định dạng số: " + e.getMessage());
+        }
+    }
+
+    private boolean kiemTraTrangThaiHoaDon(String maHoaDonHienTai) {
+        try {
+            // Assume you have a database connection method
+            Connection conn = DBConnect.getConnection();
+            String sql = "SELECT trangThai FROM HoaDon WHERE maHoaDon = ?";
+            PreparedStatement pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, maHoaDonHienTai);
+
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                int trangThai = rs.getInt("trangThai");
+                return trangThai == 1; // Return true if status is 1 (paid)
+            }
+
+            return false; // Default to false if no record found
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Lỗi kiểm tra trạng thái hóa đơn: " + e.getMessage());
+            return true; // Prevent adding product in case of error
         }
     }
 }
