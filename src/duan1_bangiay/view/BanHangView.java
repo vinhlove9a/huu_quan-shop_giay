@@ -633,32 +633,43 @@ public class BanHangView extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void btnHuyDonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnHuyDonActionPerformed
-        // TODO add your handling code here:
-        try {
-            // Lấy mã hóa đơn từ giao diện
-            String maHoaDon = txtMaHoaDon.getText().trim();
-            if (maHoaDon.isEmpty()) {
-                JOptionPane.showMessageDialog(null, "Vui lòng chọn mã hóa đơn cần xóa!");
-                return;
+        // Lấy mã hóa đơn từ giao diện
+        String maHoaDon = txtMaHoaDon.getText().trim();
+        if (maHoaDon.isEmpty()) {
+            JOptionPane.showMessageDialog(null, "Vui lòng chọn mã hóa đơn cần xóa!");
+            return;
+        }
+        // Hiển thị hộp thoại xác nhận
+        int confirm = JOptionPane.showConfirmDialog(null,
+                "Bạn có chắc chắn muốn xóa đơn hàng này khỏi cơ sở dữ liệu?",
+                "Xác nhận xóa", JOptionPane.YES_NO_OPTION);
+        if (confirm != JOptionPane.YES_OPTION) {
+            return; // Người dùng chọn "Không"
+        }
+        try (Connection connection = DBConnect.getConnection()) {
+            connection.setAutoCommit(false); // Bắt đầu transaction
+
+            // Xóa chi tiết hóa đơn trước
+            String deleteChiTietSql = "DELETE FROM ChiTietHoaDon WHERE IDHoaDon = (SELECT ID FROM HoaDon WHERE MaHoaDon = ?)";
+            try (PreparedStatement psChiTiet = connection.prepareStatement(deleteChiTietSql)) {
+                psChiTiet.setString(1, maHoaDon);
+                psChiTiet.executeUpdate();
             }
 
-            // Hiển thị hộp thoại xác nhận
-            int confirm = JOptionPane.showConfirmDialog(null, "Bạn có chắc chắn muốn xóa đơn hàng này khỏi cơ sở dữ liệu?",
-                    "Xác nhận xóa", JOptionPane.YES_NO_OPTION);
-            if (confirm != JOptionPane.YES_OPTION) {
-                return; // Người dùng chọn "Không"
-            }
+            // Xóa hóa đơn sau khi xóa chi tiết
+            String deleteHoaDonSql = "DELETE FROM HoaDon WHERE MaHoaDon = ?";
+            try (PreparedStatement psHoaDon = connection.prepareStatement(deleteHoaDonSql)) {
+                psHoaDon.setString(1, maHoaDon);
+                int rowsAffected = psHoaDon.executeUpdate();
 
-            // Xóa hóa đơn khỏi cơ sở dữ liệu
-            String sql = "DELETE FROM HoaDon WHERE MaHoaDon = ?";
-            try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
-                ps.setString(1, maHoaDon);
-
-                int rowsAffected = ps.executeUpdate();
                 if (rowsAffected > 0) {
+                    connection.commit(); // Xác nhận transaction
                     JOptionPane.showMessageDialog(null, "Đơn hàng đã được xóa thành công!");
                     loadTables(); // Tải lại bảng dữ liệu
+                    clearGioHang();
+                    clearTextFields();
                 } else {
+                    connection.rollback(); // Quay lại nếu không xóa được
                     JOptionPane.showMessageDialog(null, "Không tìm thấy đơn hàng để xóa!");
                 }
             }
@@ -898,7 +909,57 @@ public class BanHangView extends javax.swing.JFrame {
 
     private void tblHoaDonChiTietMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tblHoaDonChiTietMouseClicked
         // TODO add your handling code here:
-        
+        if (maHoaDonHienTai == null) {
+            JOptionPane.showMessageDialog(null, "Chưa chọn hóa đơn!");
+            return; // Exit if no invoice is selected
+        }
+
+// Check if the invoice has already been paid
+        if (kiemTraTrangThaiHoaDon(maHoaDonHienTai)) {
+            JOptionPane.showMessageDialog(null, "Hóa đơn đã thanh toán, không thể xóa sản phẩm!");
+            return; // Exit if the invoice is paid
+        }
+
+// Check if a product is selected in the invoice details table
+        int row = tblHoaDonChiTiet.getSelectedRow();
+        if (row != -1) {
+            try {
+                // Retrieve product details from the selected row
+                String tenHangHoa = tblHoaDonChiTiet.getValueAt(row, 1).toString(); // Product name
+                int soLuong = Integer.parseInt(tblHoaDonChiTiet.getValueAt(row, 3).toString()); // Quantity
+
+                // Confirm deletion of the product
+                int confirm = JOptionPane.showConfirmDialog(null,
+                        "Bạn có chắc chắn muốn xóa sản phẩm \"" + tenHangHoa + "\" khỏi hóa đơn?",
+                        "Xác nhận xóa sản phẩm", JOptionPane.YES_NO_OPTION);
+                if (confirm != JOptionPane.YES_OPTION) {
+                    return; // Exit if user cancels
+                }
+
+                // Execute deletion logic
+                xoaSanPhamKhoiChiTietHoaDon(maHoaDonHienTai, tenHangHoa);
+
+                // Update product details in inventory
+                int idSanPham = getIdSanPhamFromTenSanPham(tenHangHoa); // Retrieve product ID
+                capNhatSoLuongSanPham(idSanPham, soLuong); // Update quantity in inventory
+
+                // Refresh invoice and product details
+                capNhatChiTietHoaDon(maHoaDonHienTai); // Update invoice details
+                SanPhamRepository sanPhamRepository = new SanPhamRepository();
+                sanPhamRepository.getAllSanPham(); // Update product inventory list
+
+                // Inform the user about successful deletion and product update
+                JOptionPane.showMessageDialog(null,
+                        "Đã xóa sản phẩm \"" + tenHangHoa + "\" khỏi hóa đơn và cập nhật số lượng trong kho thành công!");
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(null, "Lỗi khi xử lý số lượng sản phẩm! Vui lòng kiểm tra lại.");
+            } catch (Exception e) {
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(null, "Đã xảy ra lỗi khi xóa sản phẩm: " + e.getMessage());
+            }
+        } else {
+            JOptionPane.showMessageDialog(null, "Vui lòng chọn sản phẩm để xóa!");
+        }
     }//GEN-LAST:event_tblHoaDonChiTietMouseClicked
 
     /**
@@ -1300,5 +1361,41 @@ public class BanHangView extends javax.swing.JFrame {
             JOptionPane.showMessageDialog(null, "Lỗi kiểm tra trạng thái hóa đơn: " + e.getMessage());
             return true; // Prevent adding product in case of error
         }
+    }
+
+    public void xoaSanPhamKhoiChiTietHoaDon(String maHoaDon, String tenHangHoa) {
+        String sql = "DELETE FROM ChiTietHoaDon WHERE IDHoaDon = (SELECT ID FROM HoaDon WHERE MaHoaDon = ?) "
+                + "AND IDSanPham = (SELECT ID FROM SanPham WHERE TenSanPham = ?)";
+        try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
+            // Set parameters for the SQL query
+            ps.setString(1, maHoaDon);  // Hóa đơn ID
+            ps.setString(2, tenHangHoa);  // Tên sản phẩm (must match database)
+
+            int rowsAffected = ps.executeUpdate();
+            if (rowsAffected > 0) {
+                JOptionPane.showMessageDialog(null, "Đã xóa sản phẩm \"" + tenHangHoa + "\" khỏi hóa đơn!");
+            } else {
+                JOptionPane.showMessageDialog(null, "Không tìm thấy sản phẩm \"" + tenHangHoa + "\" trong hóa đơn!");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Lỗi khi xóa sản phẩm: " + e.getMessage());
+        }
+    }
+
+    private int getIdSanPhamFromTenSanPham(String tenSanPham) {
+        // Query to retrieve ID corresponding to TenSanPham
+        String sql = "SELECT ID FROM SanPham WHERE TenSanPham = ?";
+        try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, tenSanPham); // Bind product name to query
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) { // If result is found
+                return rs.getInt("ID"); // Return ID value
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Lỗi khi lấy ID cho sản phẩm: " + e.getMessage());
+        }
+        return -1; // Return -1 if ID not found
     }
 }
