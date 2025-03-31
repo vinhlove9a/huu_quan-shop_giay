@@ -268,6 +268,11 @@ public class BanHangView extends javax.swing.JFrame {
                 "STT", "Tên Hàng Hóa", "Đơn Giá", "Số lượng", "Thành Tiền"
             }
         ));
+        tblHoaDonChiTiet.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                tblHoaDonChiTietMouseClicked(evt);
+            }
+        });
         jScrollPane2.setViewportView(tblHoaDonChiTiet);
 
         tblSanPham.setModel(new javax.swing.table.DefaultTableModel(
@@ -629,6 +634,38 @@ public class BanHangView extends javax.swing.JFrame {
 
     private void btnHuyDonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnHuyDonActionPerformed
         // TODO add your handling code here:
+        try {
+            // Lấy mã hóa đơn từ giao diện
+            String maHoaDon = txtMaHoaDon.getText().trim();
+            if (maHoaDon.isEmpty()) {
+                JOptionPane.showMessageDialog(null, "Vui lòng chọn mã hóa đơn cần xóa!");
+                return;
+            }
+
+            // Hiển thị hộp thoại xác nhận
+            int confirm = JOptionPane.showConfirmDialog(null, "Bạn có chắc chắn muốn xóa đơn hàng này khỏi cơ sở dữ liệu?",
+                    "Xác nhận xóa", JOptionPane.YES_NO_OPTION);
+            if (confirm != JOptionPane.YES_OPTION) {
+                return; // Người dùng chọn "Không"
+            }
+
+            // Xóa hóa đơn khỏi cơ sở dữ liệu
+            String sql = "DELETE FROM HoaDon WHERE MaHoaDon = ?";
+            try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
+                ps.setString(1, maHoaDon);
+
+                int rowsAffected = ps.executeUpdate();
+                if (rowsAffected > 0) {
+                    JOptionPane.showMessageDialog(null, "Đơn hàng đã được xóa thành công!");
+                    loadTables(); // Tải lại bảng dữ liệu
+                } else {
+                    JOptionPane.showMessageDialog(null, "Không tìm thấy đơn hàng để xóa!");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Lỗi khi xóa hóa đơn: " + e.getMessage());
+        }
     }//GEN-LAST:event_btnHuyDonActionPerformed
 
     private void btnTaoDonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnTaoDonActionPerformed
@@ -858,6 +895,11 @@ public class BanHangView extends javax.swing.JFrame {
         // TODO add your handling code here:
 
     }//GEN-LAST:event_tblChuaThanhToanMouseClicked
+
+    private void tblHoaDonChiTietMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tblHoaDonChiTietMouseClicked
+        // TODO add your handling code here:
+        
+    }//GEN-LAST:event_tblHoaDonChiTietMouseClicked
 
     /**
      * @param args the command line arguments
