@@ -808,8 +808,16 @@ public class BanHangView extends javax.swing.JFrame {
                     return;
                 }
 
-                // Add product to ChiTietHoaDon table in the database
-                themSanPhamVaoChiTietHoaDon(maHoaDonHienTai, maSP, soLuong, donGia);
+                // Check if the product already exists in the invoice details
+                boolean productExists = checkProductExistsInInvoice(maHoaDonHienTai, maSP);
+
+                if (productExists) {
+                    // If the product exists, update its quantity in the invoice details table
+                    updateProductQuantityInInvoice(maHoaDonHienTai, maSP, soLuong);
+                } else {
+                    // If the product doesn't exist, add it as a new row in the invoice details table
+                    themSanPhamVaoChiTietHoaDon(maHoaDonHienTai, maSP, soLuong, donGia);
+                }
 
                 // Update product quantity in ChiTietSanPham
                 int idSanPham = getIdSanPhamFromMaSP(maSP);
@@ -834,6 +842,35 @@ public class BanHangView extends javax.swing.JFrame {
             }
         } else {
             JOptionPane.showMessageDialog(null, "Vui lòng chọn sản phẩm để thêm!");
+        }
+    }
+
+    public boolean checkProductExistsInInvoice(String maHoaDon, String maSP) {
+        String sql = "SELECT COUNT(*) FROM ChiTietHoaDon WHERE IDHoaDon = (SELECT ID FROM HoaDon WHERE MaHoaDon = ?) AND IDSanPham = (SELECT ID FROM SanPham WHERE MaSanPham = ?)";
+        try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, maHoaDon);
+            ps.setString(2, maSP);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1) > 0; // Returns true if the product exists
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Lỗi khi kiểm tra sản phẩm: " + e.getMessage());
+        }
+        return false; // Return false if no match is found
+    }
+
+    public void updateProductQuantityInInvoice(String maHoaDon, String maSP, int soLuongThem) {
+        String sql = "UPDATE ChiTietHoaDon SET SoLuong = SoLuong + ? WHERE IDHoaDon = (SELECT ID FROM HoaDon WHERE MaHoaDon = ?) AND IDSanPham = (SELECT ID FROM SanPham WHERE MaSanPham = ?)";
+        try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setInt(1, soLuongThem); // Increase the quantity
+            ps.setString(2, maHoaDon); // Invoice ID
+            ps.setString(3, maSP);     // Product ID
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Lỗi khi cập nhật số lượng sản phẩm trong hóa đơn: " + e.getMessage());
         }
     }
 
@@ -895,6 +932,25 @@ public class BanHangView extends javax.swing.JFrame {
         }
     }
 
+    public void capNhatSoLuongSanPhamSetQuantity(int idSanPham, int soLuongThem) {
+        // SQL to increase stock quantity
+        String sql = "UPDATE ChiTietSanPham SET SoLuong = SoLuong + ? WHERE ID = ?";
+        try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setInt(1, soLuongThem); // Add stock
+            ps.setInt(2, idSanPham);   // Reference product by ID
+
+            int rowsAffected = ps.executeUpdate();
+            if (rowsAffected > 0) {
+                JOptionPane.showMessageDialog(null, "Số lượng sản phẩm đã được cập nhật thành công!");
+            } else {
+                JOptionPane.showMessageDialog(null, "Không tìm thấy sản phẩm để cập nhật số lượng.");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Lỗi khi cập nhật số lượng sản phẩm: " + e.getMessage());
+        }
+    }
+
     public List<Object[]> layDanhSachChiTietHoaDonTuCSDL(String maHoaDon) {
         List<Object[]> danhSachChiTiet = new ArrayList<>();
         String sql = "SELECT ROW_NUMBER() OVER (ORDER BY cthd.ID) AS STT, "
@@ -942,15 +998,14 @@ public class BanHangView extends javax.swing.JFrame {
             return; // Exit if the invoice is paid
         }
 
-// Check if a product is selected in the invoice details table
         int row = tblHoaDonChiTiet.getSelectedRow();
         if (row != -1) {
             try {
                 // Retrieve product details from the selected row
-                String tenHangHoa = tblHoaDonChiTiet.getValueAt(row, 1).toString(); // Product name
+                String tenHangHoa = tblHoaDonChiTiet.getValueAt(row, 1).toString(); // Product Name
                 int soLuong = Integer.parseInt(tblHoaDonChiTiet.getValueAt(row, 3).toString()); // Quantity
 
-                // Confirm deletion of the product
+                // Confirm deletion
                 int confirm = JOptionPane.showConfirmDialog(null,
                         "Bạn có chắc chắn muốn xóa sản phẩm \"" + tenHangHoa + "\" khỏi hóa đơn?",
                         "Xác nhận xóa sản phẩm", JOptionPane.YES_NO_OPTION);
@@ -958,21 +1013,25 @@ public class BanHangView extends javax.swing.JFrame {
                     return; // Exit if user cancels
                 }
 
-                // Execute deletion logic
+                // Delete the product from invoice details
                 xoaSanPhamKhoiChiTietHoaDon(maHoaDonHienTai, tenHangHoa);
 
-                // Update product details in inventory
-                int idSanPham = getIdSanPhamFromTenSanPham(tenHangHoa); // Retrieve product ID
-                capNhatSoLuongSanPham(idSanPham, soLuong); // Update quantity in inventory
+                // Update product quantity in the inventory
+                int idSanPham = getIdSanPhamFromTenSanPham(tenHangHoa); // Retrieve Product ID
+                if (idSanPham != -1) {
+                    capNhatSoLuongSanPhamSetQuantity(idSanPham, soLuong); // Add the quantity back to inventory
+                    loadTables();
+                } else {
+                    JOptionPane.showMessageDialog(null, "Không tìm thấy sản phẩm để cập nhật số lượng.");
+                }
 
-                // Refresh invoice and product details
-                capNhatChiTietHoaDon(maHoaDonHienTai); // Update invoice details
+                // Refresh table details
+                capNhatChiTietHoaDon(maHoaDonHienTai); // Refresh invoice details
                 SanPhamRepository sanPhamRepository = new SanPhamRepository();
-                sanPhamRepository.getAllSanPham(); // Update product inventory list
+                sanPhamRepository.getAllSanPham(); // Refresh inventory list
 
-                // Inform the user about successful deletion and product update
                 JOptionPane.showMessageDialog(null,
-                        "Đã xóa sản phẩm \"" + tenHangHoa + "\" khỏi hóa đơn và cập nhật số lượng trong kho thành công!");
+                        "Đã xóa sản phẩm \"" + tenHangHoa + "\" khỏi hóa đơn và tăng lại số lượng trong kho thành công!");
             } catch (NumberFormatException e) {
                 JOptionPane.showMessageDialog(null, "Lỗi khi xử lý số lượng sản phẩm! Vui lòng kiểm tra lại.");
             } catch (Exception e) {
@@ -1405,19 +1464,18 @@ public class BanHangView extends javax.swing.JFrame {
         }
     }
 
-    private int getIdSanPhamFromTenSanPham(String tenSanPham) {
-        // Query to retrieve ID corresponding to TenSanPham
+    public int getIdSanPhamFromTenSanPham(String tenSanPham) {
         String sql = "SELECT ID FROM SanPham WHERE TenSanPham = ?";
         try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setString(1, tenSanPham); // Bind product name to query
             ResultSet rs = ps.executeQuery();
-            if (rs.next()) { // If result is found
-                return rs.getInt("ID"); // Return ID value
+            if (rs.next()) { // If a matching product is found
+                return rs.getInt("ID"); // Return the product ID
             }
         } catch (SQLException e) {
             e.printStackTrace();
             JOptionPane.showMessageDialog(null, "Lỗi khi lấy ID cho sản phẩm: " + e.getMessage());
         }
-        return -1; // Return -1 if ID not found
+        return -1; // Return -1 if no matching product is found
     }
 }
