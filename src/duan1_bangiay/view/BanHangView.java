@@ -758,7 +758,6 @@ public class BanHangView extends javax.swing.JFrame {
     }//GEN-LAST:event_rdoNamActionPerformed
 
     private void tblSanPhamMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tblSanPhamMouseClicked
-
         if (maHoaDonHienTai == null) {
             JOptionPane.showMessageDialog(null, "Chưa chọn hóa đơn để thêm sản phẩm!");
             return; // Exit if no order is selected
@@ -775,9 +774,9 @@ public class BanHangView extends javax.swing.JFrame {
         if (row != -1) {
             try {
                 // Retrieve product details from the selected row
-                String maSP = tblSanPham.getValueAt(row, 1).toString(); // Mã SP
-                String tenSP = tblSanPham.getValueAt(row, 2).toString(); // Tên SP
-                BigDecimal donGia = new BigDecimal(tblSanPham.getValueAt(row, 4).toString()); // Giá Bán
+                String maSP = tblSanPham.getValueAt(row, 1).toString(); // Mã sản phẩm
+                String tenSP = tblSanPham.getValueAt(row, 2).toString(); // Tên sản phẩm
+                BigDecimal donGia = new BigDecimal(tblSanPham.getValueAt(row, 4).toString()); // Giá bán
 
                 // Prompt for the quantity
                 String soLuongStr = JOptionPane.showInputDialog("Nhập số lượng cho sản phẩm: " + tenSP);
@@ -796,24 +795,29 @@ public class BanHangView extends javax.swing.JFrame {
                 // Add product to ChiTietHoaDon table in the database
                 themSanPhamVaoChiTietHoaDon(maHoaDonHienTai, maSP, soLuong, donGia);
 
-                // Update product quantity in ChiTietSanPham and refresh the table
+                // Update product quantity in ChiTietSanPham
                 int idSanPham = getIdSanPhamFromMaSP(maSP);
-                capNhatSoLuongSanPham(idSanPham, soLuong);
+                capNhatSoLuongSanPham(idSanPham, soLuong); // Deduct stock quantity
 
-                // Refresh tblHoaDonChiTiet and tblSanPham
+                // Refresh invoice details and product list
                 capNhatChiTietHoaDon(maHoaDonHienTai);
                 SanPhamRepository sanPhamRepository = new SanPhamRepository();
-                sanPhamRepository.getAllSanPham();
+                sanPhamRepository.getAllSanPham(); // Refresh product inventory
 
-                JOptionPane.showMessageDialog(null, "Đã thêm sản phẩm thành công và cập nhật số lượng!");
+                // Update total price for the invoice
                 capNhatTongTienChoHoaDon();
-                capNhatSoLuongSanPham(idSanPham, soLuong);
+
+                // Notify success
+                JOptionPane.showMessageDialog(null, "Đã thêm sản phẩm \"" + tenSP + "\" thành công và cập nhật số lượng!");
+
             } catch (NumberFormatException e) {
                 JOptionPane.showMessageDialog(null, "Số lượng không hợp lệ! Vui lòng nhập số nguyên.");
             } catch (Exception e) {
                 e.printStackTrace();
                 JOptionPane.showMessageDialog(null, "Đã xảy ra lỗi khi thêm sản phẩm: " + e.getMessage());
             }
+        } else {
+            JOptionPane.showMessageDialog(null, "Vui lòng chọn sản phẩm để thêm!");
         }
     }
 
@@ -852,20 +856,22 @@ public class BanHangView extends javax.swing.JFrame {
         }
     }
 
-    public void capNhatSoLuongSanPham(int idSanPham, int soLuongBan) {
+    public void capNhatSoLuongSanPham(int idSanPham, int soLuongThayDoi) {
+        // SQL to update stock
         String sql = "UPDATE ChiTietSanPham SET SoLuong = CASE WHEN SoLuong >= ? THEN SoLuong - ? ELSE SoLuong END WHERE ID = ?";
         try (Connection connection = DBConnect.getConnection(); PreparedStatement ps = connection.prepareStatement(sql)) {
-            ps.setInt(1, soLuongBan); // Ensure the product has enough stock
-            ps.setInt(2, soLuongBan); // Deduct the stock
-            ps.setInt(3, idSanPham);  // Reference by IDSanPham
-            int rowsAffected = ps.executeUpdate();
+            ps.setInt(1, soLuongThayDoi); // Ensure enough stock exists
+            ps.setInt(2, soLuongThayDoi); // Deduct stock
+            ps.setInt(3, idSanPham);      // Reference product by ID
 
+            int rowsAffected = ps.executeUpdate();
             if (rowsAffected > 0) {
+                // Refresh inventory and UI
                 SanPhamRepository sanPhamRepository = new SanPhamRepository();
                 sanPhamRepository.getAllSanPham();
                 loadTables();
             } else {
-                JOptionPane.showMessageDialog(null, "Cập nhật thất bại! Sản phẩm có thể không tồn tại hoặc không đủ số lượng.");
+                JOptionPane.showMessageDialog(null, "Cập nhật thất bại! Sản phẩm không đủ số lượng hoặc không tồn tại.");
             }
         } catch (SQLException e) {
             e.printStackTrace();
