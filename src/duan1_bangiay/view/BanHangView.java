@@ -639,24 +639,40 @@ public class BanHangView extends javax.swing.JFrame {
             JOptionPane.showMessageDialog(null, "Vui lòng chọn mã hóa đơn cần xóa!");
             return;
         }
-        // Hiển thị hộp thoại xác nhận
+
+// Hiển thị hộp thoại xác nhận
         int confirm = JOptionPane.showConfirmDialog(null,
                 "Bạn có chắc chắn muốn xóa đơn hàng này khỏi cơ sở dữ liệu?",
                 "Xác nhận xóa", JOptionPane.YES_NO_OPTION);
         if (confirm != JOptionPane.YES_OPTION) {
             return; // Người dùng chọn "Không"
         }
+
         try (Connection connection = DBConnect.getConnection()) {
             connection.setAutoCommit(false); // Bắt đầu transaction
 
-            // Xóa chi tiết hóa đơn trước
+            // Lấy các sản phẩm trong hóa đơn để cập nhật số lượng
+            String selectChiTietSql = "SELECT IDSanPham, SoLuong FROM ChiTietHoaDon WHERE IDHoaDon = (SELECT ID FROM HoaDon WHERE MaHoaDon = ?)";
+            try (PreparedStatement psSelect = connection.prepareStatement(selectChiTietSql)) {
+                psSelect.setString(1, maHoaDon);
+                try (ResultSet rs = psSelect.executeQuery()) {
+                    // Cập nhật lại số lượng sản phẩm trong kho
+                    while (rs.next()) {
+                        int idSanPham = rs.getInt("IDSanPham");
+                        int soLuong = rs.getInt("SoLuong");
+                        capNhatSoLuongSanPham(idSanPham, -soLuong); // Cộng lại số lượng về kho
+                    }
+                }
+            }
+
+            // Xóa chi tiết hóa đơn
             String deleteChiTietSql = "DELETE FROM ChiTietHoaDon WHERE IDHoaDon = (SELECT ID FROM HoaDon WHERE MaHoaDon = ?)";
             try (PreparedStatement psChiTiet = connection.prepareStatement(deleteChiTietSql)) {
                 psChiTiet.setString(1, maHoaDon);
                 psChiTiet.executeUpdate();
             }
 
-            // Xóa hóa đơn sau khi xóa chi tiết
+            // Xóa hóa đơn
             String deleteHoaDonSql = "DELETE FROM HoaDon WHERE MaHoaDon = ?";
             try (PreparedStatement psHoaDon = connection.prepareStatement(deleteHoaDonSql)) {
                 psHoaDon.setString(1, maHoaDon);
@@ -664,7 +680,7 @@ public class BanHangView extends javax.swing.JFrame {
 
                 if (rowsAffected > 0) {
                     connection.commit(); // Xác nhận transaction
-                    JOptionPane.showMessageDialog(null, "Đơn hàng đã được xóa thành công!");
+                    JOptionPane.showMessageDialog(null, "Đơn hàng đã được xóa thành công và số lượng sản phẩm đã được cập nhật!");
                     loadTables(); // Tải lại bảng dữ liệu
                     clearGioHang();
                     clearTextFields();
