@@ -1059,6 +1059,7 @@ public class BanHangView extends javax.swing.JFrame {
 
                 JOptionPane.showMessageDialog(null,
                         "Đã xóa sản phẩm \"" + tenHangHoa + "\" khỏi hóa đơn và tăng lại số lượng trong kho thành công!");
+                capNhatTongTienChoHoaDon();
                 loadTables();
             } catch (NumberFormatException e) {
                 JOptionPane.showMessageDialog(null, "Lỗi khi xử lý số lượng sản phẩm! Vui lòng kiểm tra lại.");
@@ -1387,25 +1388,29 @@ public class BanHangView extends javax.swing.JFrame {
     private BigDecimal tinhTongTienTuTblHoaDonChiTiet() {
         BigDecimal tongTien = BigDecimal.ZERO; // Khởi tạo tổng tiền ban đầu là 0
         DefaultTableModel model = (DefaultTableModel) tblHoaDonChiTiet.getModel();
+
         if (model.getRowCount() == 0) {
-            lblTongTien.setText(" 0 VND");
-            return tongTien;
+            lblTongTien.setText("0 VND");
+            txtTongTien.setText("0");
+            txtThanhTien.setText("0");
+            return tongTien; // Không cần tính toán nếu không có dòng nào
         }
 
+        // Duyệt qua từng dòng trong bảng để tính tổng tiền
         for (int i = 0; i < model.getRowCount(); i++) {
             Object thanhTienObj = model.getValueAt(i, 4); // Cột 4 là "ThanhTien"
             if (thanhTienObj != null) {
                 BigDecimal thanhTien = new BigDecimal(thanhTienObj.toString());
-                tongTien = tongTien.add(thanhTien); // Cộng từng giá trị "ThanhTien" vào tổng
-                lblTongTien.setText(tongTien.compareTo(BigDecimal.ZERO) > 0
-                        ? tongTien.toString() + " VND"
-                        : " 0 VND");
-                txtTongTien.setText(tongTien.toString());
-                txtThanhTien.setText(tongTien.toString());
+                tongTien = tongTien.add(thanhTien); // Cộng giá trị "ThanhTien" vào tổng
             }
         }
 
-        return tongTien;
+        // Cập nhật các nhãn và ô text
+        lblTongTien.setText(tongTien.compareTo(BigDecimal.ZERO) > 0 ? tongTien + " VND" : "0 VND");
+        txtTongTien.setText(tongTien.toString());
+        txtThanhTien.setText(tongTien.toString());
+
+        return tongTien; // Trả về tổng tiền
     }
 
     private void luuTongTienVaoHoaDon(BigDecimal tongTien, String maHoaDon) {
